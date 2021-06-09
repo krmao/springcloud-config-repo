@@ -1,4 +1,2 @@
 server:
     port: 5381
-    servlet:
-        context-path: /app-b
