@@ -1,0 +1,181 @@
+# Chinese comments will call Caused by: org.yaml.snakeyaml.error.YAMLException: java.nio.charset.MalformedInputException: Input length = 2
+# error on Windows system, but well on Mac system
+
+# https://stackoverflow.com/a/29194250/4348530
+debug: ${server_debug}
+
+server:
+    port: 5380
+    servlet:
+        context-path: /app-a
+
+eureka:
+    client:
+        service-url:
+            # eureka-server address
+            defaultZone: http://10.32.33.6:5388/eureka
+        register-with-eureka: true
+        fetch-registry: true
+    instance:
+        hostname: \${spring.cloud.client.ip-address}
+        prefer-ip-address: true
+        # https://www.jianshu.com/p/5ad8317961b7
+        # https://stackoverflow.com/a/29194250/4348530
+        instance-id: \${spring.cloud.client.ip-address}:\${server.port}\${server.servlet.context-path}@${app_a_version}
+
+# eureka-client-a call eureka-client-b , config in eureka-client-a
+# https://www.cnblogs.com/zhainan-blog/p/11634621.html
+ribbon:
+    ReadTimeout: 5000
+    ConnectTimeout: 5000
+    eager-load:
+        enabled: false
+        clients:  http://10.32.33.6:5388/eureka
+        MaxTotalConnections: 5
+        MaxConnectionsPerHost: 5
+        maxAutoRetries: 2
+        maxAutoRetriesNextServer: 2
+        okToRetryOnAllOperations: true
+        retryableStatusCodes: 500,404,502
+        ###eureka-provider:
+        ### ribbon:
+        ###   NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule
+
+hystrix:
+    command:
+        default:
+            circuitBreaker:
+                enabled: false
+                requestVolumeThreshold: 10
+                errorThresholdPercentage: 50
+                forceOpen: false
+                forceClosed: false
+            fallback:
+                enabled: true
+            execution:
+                timeout:
+                    # https://www.cnblogs.com/throwable/p/11961016.html
+                    enabled: false
+            isolation:
+                semaphore:
+                    maxConcurrentRequests: 4
+                strategy: THREAD
+                thread:
+                    timeoutInMilliseconds: 10
+                    # https://www.cnblogs.com/throwable/p/11961016.html
+                    interruptOnTimeout: true
+                    interruptOnCancel: true
+
+    # https://blog.csdn.net/weixin_33809981/article/details/88678620
+    threadpool:
+        default:
+            coreSize: 1
+            maxQueueSize: 4
+
+feign:
+    hystrix:
+        enabled: true
+    compression:
+        request:
+            enabled: true
+            mime-types: ["text/xml", "application/xml","application/json"]
+        response:
+            enabled: true
+    client:
+        config:
+            default:
+                connectTimeout: 50
+                readTimeout: 50
+                loggerLevel: full
+
+security:
+    user:
+        name: root
+        password: root
+
+spring:
+    main:
+        # if call multi time @EnableFeignClients, will cause error bellow, set allow-bean-definition-overriding will avoid error, so try ony call once @EnableFeignClients
+        # org.springframework.beans.factory.support.BeanDefinitionOverrideException: Invalid bean definition with name 'APP-TEMPLATE-B.FeignClientSpecification'
+        # defined in null: Cannot register bean definition [Generic bean: class [org.springframework.cloud.openfeign.FeignClientSpecification];
+        allow-bean-definition-overriding: false
+    application:
+        # name in eureka-server
+        name: APP-A
+    jpa:
+        hibernate:
+            ddl-auto: none
+        show-sql: false
+    datasource:
+        type: com.alibaba.druid.pool.DruidDataSource
+        url: jdbc:mysql://${server_sql_ip}:${server_sql_port}/springboot?useUnicode=true&characterEncoding=UTF8&useCursorFetch=true&useSSL=false&allowPublicKeyRetrieval=true
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        username: ${server_sql_user}
+        password: ${server_sql_password}
+        schema: classpath:/sql/schema-mysql.sql
+        data: classpath:/sql/data-mysql.sql
+
+        druid:
+            filters: stat,wall,log4j2
+            maxActive: 20
+            initialSize: 0
+            maxWait: 60000
+            minIdle: 1
+            timeBetweenEvictionRunsMillis: 60000
+            minEvictableIdleTimeMillis: 300000
+            validationQuery: select 'x'
+            testWhileIdle: true
+            testOnBorrow: false
+            testOnReturn: false
+            poolPreparedStatements: true
+            maxPoolPreparedStatementPerConnectionSize: 20
+            connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
+            maxOpenPreparedStatements: 20
+            useGlobalDataSourceStat: true
+    resources:
+        cache:
+            # https://www.twblogs.net/a/5b8c454a2b7177188331c861
+            period: 15s
+        static-locations: classpath:/META-INF/resources/,classpath:/resources/,classpath:/public/,classpath:/static/
+    #    thymeleaf:
+    #        suffix: .html
+    #        prefix: classpath:/templates/
+    jackson:
+        default-property-inclusion: non_null
+        date-format: yyyy-MM-dd HH:mm:ss
+        time-zone: GMT+8
+    http:
+        multipart:
+            max-file-size: 10MB
+            max-request-size: 10MB
+
+mybatis:
+    configuration:
+        mapUnderscoreToCamelCase: true
+    type-aliases-package: com.smart.springcloud.appa.background.model
+    mapper-locations: classpath:mapper/**/*.xml
+
+# TRACE, DEBUG, INFO, WARN, ERROR, FATAL, OFF
+logging:
+    level:
+        root: WARN
+        com.smart: DEBUG
+        static: WARN
+        org.springframework:
+            data: WARN
+            security: WARN
+
+# JWT http://www.jianshu.com/p/6307c89fe3fa
+# https://stackoverflow.com/questions/27416327/configurationproperties-prefix-not-working
+jwt:
+    secret: ${server_jwt_secret}
+    tokenPrefix: "Bearer "
+    header: "Authorization"
+    accessToken:
+        expiration: 1800
+    refreshToken:
+        expiration: 7200
+    authRoute:
+        login: "auth/login"
+        register: "auth/register"
+        refreshToken: "auth/refreshToken"
